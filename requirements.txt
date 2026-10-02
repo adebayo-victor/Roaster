@@ -3,3 +3,6 @@ waitress==2.1.2
 pywebview==4.4.1
 numpy==1.26.0
 onnxruntime==1.16.3
+opencv-python-headless==4.8.1.78
+deepface==0.0.90
+tf-keras==2.15.0
