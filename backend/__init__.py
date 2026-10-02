@@ -2,7 +2,7 @@ import os
 import sys
 from flask import Flask
 
-def create_app(db_path):
+def create_app(db_path, data_dir):
     # Determine where the 'templates' and 'static' folders are
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
@@ -13,8 +13,9 @@ def create_app(db_path):
                 template_folder=os.path.join(base_path, 'templates'),
                 static_folder=os.path.join(base_path, 'static'))
 
-    # Store the database path in the app config
+    # Store paths in the app config
     app.config['DB_PATH'] = db_path
+    app.config['DATA_DIR'] = data_dir
     app.config['SECRET_KEY'] = 'super-secret-local-key' 
 
     # Import and register routes
