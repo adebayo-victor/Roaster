@@ -44,7 +44,7 @@ def start_server(app, port):
 
 if __name__ == '__main__':
     # 1. Initialize Flask App
-    app = create_app(DB_PATH)
+        app = create_app(DB_PATH, DATA_DIR)
 
     # 2. Find a free port and start Flask in a background thread
     port = find_free_port()
