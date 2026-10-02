@@ -6,7 +6,6 @@ main_routes = Blueprint('main', __name__)
 
 @main_routes.route('/')
 def index():
-    """The main dashboard showing the 'Folders'."""
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     workspaces = conn.execute('SELECT * FROM workspaces ORDER BY created_at DESC').fetchall()
@@ -19,7 +18,6 @@ def health_check():
 
 @main_routes.route('/api/workspace', methods=['POST'])
 def create_workspace():
-    """API endpoint to create a new Workspace (Folder)."""
     data = request.json
     name = data.get('name')
     folder_type = data.get('folder_type')
@@ -39,13 +37,8 @@ def create_workspace():
     conn.close()
     return jsonify({"status": "success", "message": "Workspace created!"}), 201
 
-# ==========================================
-# NEW ROUTES FOR BATCH 3
-# ==========================================
-
 @main_routes.route('/workspace/<int:ws_id>')
 def open_workspace(ws_id):
-    """Renders the inside of a specific workspace."""
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     ws = conn.execute('SELECT * FROM workspaces WHERE id = ?', (ws_id,)).fetchone()
@@ -58,7 +51,6 @@ def open_workspace(ws_id):
 
 @main_routes.route('/api/workspace/<int:ws_id>/employees', methods=['GET'])
 def get_employees(ws_id):
-    """Fetches all employees for a specific workspace."""
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     employees = conn.execute('SELECT * FROM staff WHERE workspace_id = ?', (ws_id,)).fetchall()
@@ -67,7 +59,6 @@ def get_employees(ws_id):
 
 @main_routes.route('/api/workspace/<int:ws_id>/add_employee', methods=['POST'])
 def add_employee(ws_id):
-    """Handles adding a new employee and their photo."""
     name = request.form.get('name')
     role = request.form.get('role')
     photo = request.files.get('photo')
@@ -75,39 +66,35 @@ def add_employee(ws_id):
     if not name or not photo:
         return jsonify({"error": "Name and photo are required"}), 400
 
-    # 1. Save the physical photo to the data/photos directory
-    data_dir = current_app.config['DATA_DIR']
-    photos_dir = os.path.join(data_dir, 'photos')
+    # 1. Save the physical photo to the STATIC folder so the browser can see it
+    static_dir = current_app.static_folder
+    photos_dir = os.path.join(static_dir, 'photos')
     os.makedirs(photos_dir, exist_ok=True)
     
-    # Create a unique filename
     safe_name = name.replace(' ', '_')
     filename = f"{ws_id}_{safe_name}_{photo.filename}"
-    photo_path = os.path.join(photos_dir, filename)
-    photo.save(photo_path)
+    
+    # The path the browser will use
+    photo_path_browser = f"/static/photos/{filename}" 
+    # The path the server uses to write the file
+    full_photo_path = os.path.join(photos_dir, filename) 
+    
+    photo.save(full_photo_path)
 
-    # 2. AI Extraction Placeholder
-    # In Batch 4, we will replace this with the actual ONNX model extraction.
-    # For now, we generate 128 random bytes to prove the database pipeline works.
-        # 2. AI Extraction (Real Facial Features)
-    print(f"🤖 Processing AI features for {name}... (First run may take 15s to download models)")
-    embedding_bytes = None
-    try:
-        from backend.ai_service import extract_face_embedding
-        embedding_bytes = extract_face_embedding(photo_path)
-        if embedding_bytes:
-            print("✅ Face features extracted successfully.")
-        else:
-            print("⚠️ Warning: Could not detect a clear face in the photo.")
-    except Exception as e:
-        print(f"❌ AI Error: {e}")
+    # 2. AI Extraction
+    from backend.ai_service import extract_embedding
+    embedding_bytes = extract_embedding(full_photo_path)
+    
+    if not embedding_bytes:
+        os.remove(full_photo_path)
+        return jsonify({"error": "Could not detect a face in the photo."}), 400
 
     # 3. Save to Database
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     conn.execute(
         "INSERT INTO staff (workspace_id, name, role, photo_path, face_embedding) VALUES (?, ?, ?, ?, ?)",
-        (ws_id, name, role, photo_path, embedding_bytes)
+        (ws_id, name, role, photo_path_browser, embedding_bytes)
     )
     conn.commit()
     conn.close()
