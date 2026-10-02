@@ -26,8 +26,10 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 DB_PATH = os.path.join(DATA_DIR, 'app_data.db')
 
 # Ensure the data folder exists locally
+# Ensure the data and models folders exist locally
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(os.path.join(DATA_DIR, 'photos'), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, 'models'), exist_ok=True)
 
 # ==========================================
 # 2. SERVER & WINDOW LOGIC
