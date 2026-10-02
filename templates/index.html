@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Workforce</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { color: #2c3e50; margin-bottom: 5px; }
+        .header p { color: #7f8c8d; }
+        
+        .folders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+        
+        .folder-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
+        .folder-card:hover { transform: translateY(-5px); border-color: #3498db; }
+        
+        .folder-icon { font-size: 48px; margin-bottom: 10px; }
+        .folder-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        .folder-type { font-size: 12px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .create-btn { background: #3498db; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 40px; display: block; margin-left: auto; margin-right: auto;}
+        .create-btn:hover { background: #2980b9; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Smart Workforce Manager</h1>
+        <p>Offline-First Roster & Timetable System</p>
+    </div>
+
+    <div class="folders-grid">
+        {% for ws in workspaces %}
+        <div class="folder-card" onclick="openFolder({{ ws.id }})">
+            <div class="folder-icon">📁</div>
+            <div class="folder-title">{{ ws.name }}</div>
+            <div class="folder-type">{{ ws.folder_type }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button class="create-btn" onclick="alert('Next step: Building the creation modal!')">
+        + Create New Workspace
+    </button>
+
+    <script>
+        function openFolder(id) {
+            alert(`Opening Workspace ID: ${id}. We will build the routing for this next!`);
+        }
+    </script>
+
+</body>
+</html>
