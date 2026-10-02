@@ -89,15 +89,25 @@ def add_employee(ws_id):
     # 2. AI Extraction Placeholder
     # In Batch 4, we will replace this with the actual ONNX model extraction.
     # For now, we generate 128 random bytes to prove the database pipeline works.
-    import os as os_lib
-    dummy_embedding = os_lib.urandom(128) 
+        # 2. AI Extraction (Real Facial Features)
+    print(f"🤖 Processing AI features for {name}... (First run may take 15s to download models)")
+    embedding_bytes = None
+    try:
+        from backend.ai_service import extract_face_embedding
+        embedding_bytes = extract_face_embedding(photo_path)
+        if embedding_bytes:
+            print("✅ Face features extracted successfully.")
+        else:
+            print("⚠️ Warning: Could not detect a clear face in the photo.")
+    except Exception as e:
+        print(f"❌ AI Error: {e}")
 
     # 3. Save to Database
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     conn.execute(
         "INSERT INTO staff (workspace_id, name, role, photo_path, face_embedding) VALUES (?, ?, ?, ?, ?)",
-        (ws_id, name, role, photo_path, dummy_embedding)
+        (ws_id, name, role, photo_path, embedding_bytes)
     )
     conn.commit()
     conn.close()
