@@ -29,11 +29,11 @@
                     <button class="pin-btn" onclick="addPin('7')">7</button>
                     <button class="pin-btn" onclick="addPin('8')">8</button>
                     <button class="pin-btn" onclick="addPin('9')">9</button>
-                    <button class="pin-btn" onclick="clearPin()" style="color: var(--danger)">CLEAR</button>
+                    <button class="pin-btn" onclick="clearPin()" style="color: var(--danger)">CLR</button>
                     <button class="pin-btn" onclick="addPin('0')">0</button>
                     <button class="pin-btn" onclick="submitPin()" style="background: var(--accent)">&#10003;</button>
                 </div>
-                <div id="checkinMsg" style="text-align: center; margin-top: 1rem; font-weight: bold;"></div>
+                <div id="checkinMsg" style="text-align: center; margin-top: 1rem; font-weight: bold; min-height: 1.5rem;"></div>
             </div>
 
             <!-- Right: Live Table -->
@@ -103,15 +103,16 @@
                 if (res.ok) {
                     msgEl.innerText = `Welcome, ${data.name}! Status: ${data.verified_status}`;
                     msgEl.style.color = "var(--accent)";
-                    setTimeout(() => location.reload(), 2000); // Reload to update table
+                    setTimeout(() => location.reload(), 2000); 
                 } else {
                     msgEl.innerText = data.error || "Error";
                     msgEl.style.color = "var(--danger)";
+                    setTimeout(clearPin, 1500);
                 }
             } catch (e) {
                 msgEl.innerText = "Network Error";
+                msgEl.style.color = "var(--danger)";
             }
-            clearPin();
         }
     </script>
 </body>
