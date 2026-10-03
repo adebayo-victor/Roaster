@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - {{ workspace.name }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="modal-overlay" style="display: flex;">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h2>Admin Authentication Required</h2>
+            <p style="color: var(--text-muted); margin: 1rem 0;">Enter Master Password</p>
+            <input type="password" id="adminPass" class="input-field" placeholder="Default: admin123">
+            <button class="btn btn-primary" style="width: 100%" onclick="checkLogin()">Unlock Control Center</button>
+        </div>
+    </div>
+
+    <!-- Main Admin UI -->
+    <div class="container" id="adminUI" style="display: none;">
+        <div class="header">
+            <div>
+                <a href="/" class="btn btn-outline" style="margin-right: 1rem;">&larr; Back</a>
+                <h1 style="display:inline">Admin Control Center <span class="badge badge-on-time">Offline Master</span></h1>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('tab1', this)">1. Roster Setup</div>
+            <div class="tab" onclick="switchTab('tab2', this)">2. Staff Registry</div>
+            <div class="tab" onclick="switchTab('tab3', this)">3. Audit Logs</div>
+        </div>
+
+        <!-- Tab 1: Setup -->
+        <div id="tab1" class="tab-content active">
+            <div class="card">
+                <h3>Current Folder Settings</h3>
+                <p>Name: <b>{{ workspace.name }}</b></p>
+                <p>Shift: {{ workspace.shift_start }} to {{ workspace.shift_end }}</p>
+                <p>Grace Period: {{ workspace.grace_mins }} mins</p>
+            </div>
+        </div>
+
+        <!-- Tab 2: Staff -->
+        <div id="tab2" class="tab-content">
+            <div class="card">
+                <h3>Register New Staff</h3>
+                <form id="staffForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <input type="text" id="staffName" class="input-field" placeholder="Full Name" required>
+                    <input type="text" id="staffPin" class="input-field" placeholder="4-Digit PIN" maxlength="4" required>
+                    <input type="text" id="staffStation" class="input-field" placeholder="{{ workspace.custom_property_title }}">
+                    <input type="file" id="staffPhoto" class="input-field" accept="image/*" required>
+                    <button type="submit" class="btn btn-primary" style="grid-column: span 2;">Register & Add Staff</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tab 3: Logs -->
+        <div id="tab3" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Attendance Audit Logs</h3>
+                    <a href="/api/admin/export/{{ workspace.id }}" class="btn btn-primary">Download CSV</a>
+                </div>
+                <table id="logsTable">
+                    <thead>
+                        <tr><th>Date</th><th>Time</th><th>Name</th><th>Status</th><th>Method</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wsId = {{ workspace.id }};
+
+        function checkLogin() {
+            if (document.getElementById('adminPass').value === 'admin123') {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('adminUI').style.display = 'block';
+                loadLogs();
+            } else {
+                alert('Invalid Password');
+            }
+        }
+
+        function switchTab(tabId, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            el.classList.add('active');
+        }
+
+        document.getElementById('staffForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('name', document.getElementById('staffName').value);
+            formData.append('pin', document.getElementById('staffPin').value);
+            formData.append('station', document.getElementById('staffStation').value);
+            formData.append('photo', document.getElementById('staffPhoto').files[0]);
+
+            const res = await fetch(`/api/workspace/${wsId}/staff`, { method: 'POST', body: formData });
+            if (res.ok) { alert('Staff Added!'); location.reload(); }
+            else { alert('Error adding staff'); }
+        });
+
+        async function loadLogs() {
+            const res = await fetch(`/api/admin/logs/${wsId}`);
+            const logs = await res.json();
+            const tbody = document.querySelector('#logsTable tbody');
+            tbody.innerHTML = logs.map(l => `
+                <tr>
+                    <td>${l.date_str}</td>
+                    <td>${l.clock_in_time}</td>
+                    <td>${l.staff_name}</td>
+                    <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
+                    <td>${l.method}</td>
+                </tr>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
