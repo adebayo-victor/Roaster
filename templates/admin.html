@@ -34,9 +34,10 @@
         <div id="tab1" class="tab-content active">
             <div class="card">
                 <h3>Current Folder Settings</h3>
-                <p>Name: <b>{{ workspace.name }}</b></p>
+                <p style="margin-top:10px;">Name: <b>{{ workspace.name }}</b></p>
                 <p>Shift: {{ workspace.shift_start }} to {{ workspace.shift_end }}</p>
                 <p>Grace Period: {{ workspace.grace_mins }} mins</p>
+                <p>Custom Property: {{ workspace.custom_property_title }}</p>
             </div>
         </div>
 
@@ -44,7 +45,7 @@
         <div id="tab2" class="tab-content">
             <div class="card">
                 <h3>Register New Staff</h3>
-                <form id="staffForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <form id="staffForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                     <input type="text" id="staffName" class="input-field" placeholder="Full Name" required>
                     <input type="text" id="staffPin" class="input-field" placeholder="4-Digit PIN" maxlength="4" required>
                     <input type="text" id="staffStation" class="input-field" placeholder="{{ workspace.custom_property_title }}">
@@ -99,9 +100,19 @@
             formData.append('station', document.getElementById('staffStation').value);
             formData.append('photo', document.getElementById('staffPhoto').files[0]);
 
+            const btn = e.target.querySelector('button');
+            btn.innerText = "Processing AI...";
+            btn.disabled = true;
+
             const res = await fetch(`/api/workspace/${wsId}/staff`, { method: 'POST', body: formData });
-            if (res.ok) { alert('Staff Added!'); location.reload(); }
-            else { alert('Error adding staff'); }
+            if (res.ok) { 
+                alert('Staff Added Successfully!'); 
+                location.reload(); 
+            } else { 
+                alert('Error adding staff. Check console.'); 
+                btn.innerText = "Register & Add Staff";
+                btn.disabled = false;
+            }
         });
 
         async function loadLogs() {
