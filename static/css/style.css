@@ -50,6 +50,7 @@ td { padding: 1rem; border-bottom: 1px solid var(--border); }
 .badge-on-time { background: rgba(16, 185, 129, 0.2); color: var(--accent); }
 .badge-late { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 .badge-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.badge-early { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
 
 /* Admin Modal & Tabs */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: none; justify-content: center; align-items: center; }
