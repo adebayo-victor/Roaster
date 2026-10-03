@@ -49,6 +49,15 @@ def init_db(db_path):
         )
     ''')
 
+    # NEW: Settings table for Admin Password
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('admin_password', 'admin123')")
+
     conn.commit()
     conn.close()
     print(f"✅ Database initialized at: {db_path}")
