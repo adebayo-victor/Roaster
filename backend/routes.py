@@ -8,6 +8,8 @@ from backend.database import get_db_connection
 
 main_routes = Blueprint('main', __name__)
 
+# --- PAGE ROUTES ---
+
 @main_routes.route('/')
 def index():
     db_path = current_app.config['DB_PATH']
@@ -18,13 +20,20 @@ def index():
     today = datetime.now().strftime('%Y-%m-%d')
     for ws in workspaces:
         total_staff = conn.execute('SELECT COUNT(*) as c FROM staff WHERE workspace_id=?', (ws['id'],)).fetchone()['c']
-        # Get today's stats
+        
         logs = conn.execute('SELECT status FROM attendance_logs WHERE workspace_id=? AND date_str=?', (ws['id'], today)).fetchall()
         stats = {'on_time': 0, 'late': 0, 'pending': total_staff}
+        
         for log in logs:
-            if log['status'] == 'ON_TIME': stats['on_time'] += 1; stats['pending'] -= 1
-            elif log['status'] == 'LATE': stats['late'] += 1; stats['pending'] -= 1
-            
+            if log['status'] == 'ON_TIME': 
+                stats['on_time'] += 1
+                stats['pending'] -= 1
+            elif log['status'] == 'LATE': 
+                stats['late'] += 1
+                stats['pending'] -= 1
+            elif log['status'] == 'EARLY':
+                stats['pending'] -= 1 # Count early as attended for pending logic
+                
         ws_list.append({**dict(ws), 'total_staff': total_staff, 'stats': stats})
         
     conn.close()
@@ -35,7 +44,7 @@ def open_kiosk(ws_id):
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
     ws = conn.execute('SELECT * FROM workspaces WHERE id = ?', (ws_id,)).fetchone()
-    if not ws: return "Not found", 404
+    if not ws: return "Workspace not found", 404
     
     today = datetime.now().strftime('%Y-%m-%d')
     staff = conn.execute('SELECT * FROM staff WHERE workspace_id = ?', (ws_id,)).fetchall()
@@ -55,7 +64,7 @@ def open_admin(ws_id):
     conn = get_db_connection(db_path)
     ws = conn.execute('SELECT * FROM workspaces WHERE id = ?', (ws_id,)).fetchone()
     conn.close()
-    if not ws: return "Not found", 404
+    if not ws: return "Workspace not found", 404
     return render_template('admin.html', workspace=dict(ws))
 
 # --- API ENDPOINTS ---
@@ -69,7 +78,8 @@ def create_workspace():
         "INSERT INTO workspaces (name, folder_type, shift_start, shift_end, grace_mins, custom_property_title) VALUES (?, ?, ?, ?, ?, ?)",
         (data['name'], 'roster', data.get('shift_start', '09:00'), data.get('shift_end', '17:00'), int(data.get('grace_mins', 10)), data.get('custom_prop', 'Station'))
     )
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     return jsonify({"status": "success"}), 201
 
 @main_routes.route('/api/workspace/<int:ws_id>/staff', methods=['POST'])
@@ -79,7 +89,8 @@ def add_staff(ws_id):
     station = request.form.get('station')
     photo = request.files.get('photo')
 
-    if not name or not photo: return jsonify({"error": "Name and photo required"}), 400
+    if not name or not photo: 
+        return jsonify({"error": "Name and photo required"}), 400
 
     static_dir = current_app.static_folder
     photos_dir = os.path.join(static_dir, 'photos')
@@ -100,7 +111,8 @@ def add_staff(ws_id):
         "INSERT INTO staff (workspace_id, name, pin_code, station, photo_path, face_embedding) VALUES (?, ?, ?, ?, ?, ?)",
         (ws_id, name, pin, station, browser_path, embedding_bytes)
     )
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     return jsonify({"status": "success", "ai_msg": msg}), 201
 
 @main_routes.route('/api/kiosk/checkin', methods=['POST'])
@@ -108,7 +120,7 @@ def kiosk_checkin():
     data = request.json
     ws_id = data.get('ws_id')
     pin = data.get('pin')
-    live_image_b64 = data.get('image') # Base64 from webcam
+    live_image_b64 = data.get('image') # Base64 from webcam (optional for now)
     
     db_path = current_app.config['DB_PATH']
     conn = get_db_connection(db_path)
@@ -118,7 +130,7 @@ def kiosk_checkin():
         conn.close()
         return jsonify({"error": "Invalid PIN"}), 404
         
-    # Face Verification (Optional)
+    # Face Verification (If image provided)
     face_verified = False
     distance = 1.0
     if live_image_b64 and staff['face_embedding']:
@@ -161,7 +173,8 @@ def kiosk_checkin():
         "INSERT INTO attendance_logs (staff_id, workspace_id, date_str, clock_in_time, status, method) VALUES (?, ?, ?, ?, ?, ?)",
         (staff['id'], ws_id, today_str, time_str, status, method)
     )
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     
     return jsonify({
         "status": "success", 
