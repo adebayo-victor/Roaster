@@ -1,8 +1,6 @@
 Flask
 waitress
-pywebview
-numpy
 onnxruntime
 opencv-python-headless
-deepface
-tf-keras
+numpy
+Pillow
