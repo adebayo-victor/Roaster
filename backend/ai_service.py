@@ -1,50 +1,88 @@
 import os
-from deepface import DeepFace
+import cv2
+import numpy as np
+import onnxruntime as ort
+import urllib.request
 
-def extract_face_embedding(image_path):
-    """
-    Uses DeepFace to detect the face in the image and extract its 128-d embedding.
-    Returns the embedding as bytes for SQLite storage.
-    """
-    try:
-        # enforce_detection=False prevents crashes if the photo is weird/blurry
-        # model_name="Facenet" is lightweight and fast
-        embedding_objs = DeepFace.represent(
-            img_path=image_path, 
-            model_name="Facenet", 
-            enforce_detection=False,
-            detector_backend="opencv" # Uses OpenCV for fast face detection
-        )
+# A reliable, direct URL for the MobileFaceNet model
+MODEL_URL = "https://github.com/leondgarse/Keras_insightface/releases/download/v1.0.0/mobile_facenet_112x112.onnx"
+
+class FaceRecognitionService:
+    def __init__(self, model_path):
+        self.model_path = model_path
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.session = None
         
-        # DeepFace returns a list of faces found. We take the first one.
-        if embedding_objs and len(embedding_objs) > 0:
-            embedding_array = embedding_objs[0]["embedding"]
-            # Convert the list of floats to bytes for SQLite BLOB storage
-            import numpy as np
-            return np.array(embedding_array).tobytes()
-        else:
-            return None
+        # 1. Check if model exists and is valid (must be > 1MB to be a real model)
+        needs_download = not os.path.exists(model_path) or os.path.getsize(model_path) < 1000000
+        
+        if needs_download:
+            print(f"⚠️ Model missing or corrupt. Downloading fresh copy to {model_path}...")
+            try:
+                os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                urllib.request.urlretrieve(MODEL_URL, model_path)
+                print("✅ Model downloaded successfully!")
+            except Exception as e:
+                print(f"❌ Failed to download model: {e}. Face recognition will be disabled.")
+                return
+
+        # 2. Load the model into ONNX Runtime
+        try:
+            self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            print(f"✅ AI Model loaded successfully into memory.")
+        except Exception as e:
+            print(f"❌ AI Model file is corrupt. Error: {e}. Face recognition disabled.")
+    
+    def extract_embedding(self, image_path):
+        """Extract facial embedding from an image file."""
+        if not self.session:
+            return None, "AI model not loaded"
+        
+        img = cv2.imread(image_path)
+        if img is None:
+            return None, "Could not read image"
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        if len(faces) == 0:
+            return None, "No face detected"
+        
+        (x, y, w, h) = faces[0]
+        pad = 10
+        x = max(0, x - pad)
+        y = max(0, y - pad)
+        w = min(img.shape[1] - x, w + 2 * pad)
+        h = min(img.shape[0] - y, h + 2 * pad)
+        
+        face_crop = img[y:y+h, x:x+w]
+        face_resized = cv2.resize(face_crop, (112, 112))
+        
+        face_rgb = cv2.cvtColor(face_resized, cv2.COLOR_BGR2RGB)
+        face_normalized = (face_rgb.astype(np.float32) / 127.5) - 1.0
+        input_tensor = np.expand_dims(face_normalized, axis=0)
+        
+        try:
+            input_name = self.session.get_inputs()[0].name
+            output = self.session.run(None, {input_name: input_tensor})
+            embedding = output[0][0]
+            embedding = embedding / np.linalg.norm(embedding)
+            return embedding.tobytes(), "Success"
+        except Exception as e:
+            return None, f"AI inference error: {e}"
+    
+    def compare_embeddings(self, emb1_bytes, emb2_bytes, threshold=0.4):
+        """Compare two facial embeddings."""
+        if not emb1_bytes or not emb2_bytes:
+            return False, 1.0
+        
+        try:
+            vec1 = np.frombuffer(emb1_bytes, dtype=np.float32)
+            vec2 = np.frombuffer(emb2_bytes, dtype=np.float32)
             
-    except Exception as e:
-        print(f"AI Extraction Error: {e}")
-        return None
-
-def compare_faces(embedding_bytes_1, embedding_bytes_2, threshold=0.4):
-    """
-    Compares two embeddings. Returns True if they match (same person).
-    """
-    import numpy as np
-    if not embedding_bytes_1 or not embedding_bytes_2:
-        return False
-        
-    arr1 = np.frombuffer(embedding_bytes_1, dtype=np.float32)
-    arr2 = np.frombuffer(embedding_bytes_2, dtype=np.float32)
-    
-    # Calculate Cosine Similarity
-    dot_product = np.dot(arr1, arr2)
-    norm1 = np.linalg.norm(arr1)
-    norm2 = np.linalg.norm(arr2)
-    similarity = dot_product / (norm1 * norm2)
-    
-    # Higher similarity means closer match. Threshold is usually around 0.4 to 0.6
-    return similarity > threshold
+            similarity = np.dot(vec1, vec2)
+            distance = 1.0 - similarity
+            
+            return distance < threshold, round(distance, 4)
+        except:
+            return False, 1.0
