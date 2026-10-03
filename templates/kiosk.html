@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kiosk - {{ workspace.name }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/" class="btn btn-outline" style="margin-right: 1rem;">&larr; Back</a>
+                <h1 style="display:inline">{{ workspace.name }} <span class="badge badge-on-time">Active Shift</span></h1>
+            </div>
+            <div id="clock" style="font-size: 1.5rem; font-weight: bold; color: var(--accent);"></div>
+        </div>
+
+        <div class="kiosk-layout">
+            <!-- Left: PIN Pad -->
+            <div class="card">
+                <h3>Kiosk Express PIN Punch</h3>
+                <div class="pin-display" id="pinDisplay"></div>
+                <div class="pin-pad">
+                    <button class="pin-btn" onclick="addPin('1')">1</button>
+                    <button class="pin-btn" onclick="addPin('2')">2</button>
+                    <button class="pin-btn" onclick="addPin('3')">3</button>
+                    <button class="pin-btn" onclick="addPin('4')">4</button>
+                    <button class="pin-btn" onclick="addPin('5')">5</button>
+                    <button class="pin-btn" onclick="addPin('6')">6</button>
+                    <button class="pin-btn" onclick="addPin('7')">7</button>
+                    <button class="pin-btn" onclick="addPin('8')">8</button>
+                    <button class="pin-btn" onclick="addPin('9')">9</button>
+                    <button class="pin-btn" onclick="clearPin()" style="color: var(--danger)">CLEAR</button>
+                    <button class="pin-btn" onclick="addPin('0')">0</button>
+                    <button class="pin-btn" onclick="submitPin()" style="background: var(--accent)">&#10003;</button>
+                </div>
+                <div id="checkinMsg" style="text-align: center; margin-top: 1rem; font-weight: bold;"></div>
+            </div>
+
+            <!-- Right: Live Table -->
+            <div class="card">
+                <h3>Live Attendance Status</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Photo</th>
+                            <th>Staff Name</th>
+                            <th>{{ workspace.custom_property_title }}</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staffTable">
+                        {% for s in staff %}
+                        <tr>
+                            <td><img src="{{ s.photo_path }}" class="avatar-sm" onerror="this.src='https://via.placeholder.com/40'"></td>
+                            <td>{{ s.name }}</td>
+                            <td>{{ s.station }}</td>
+                            <td><span class="badge badge-{{ s.current_status | lower }}">{{ s.current_status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPin = "";
+        const wsId = {{ workspace.id }};
+
+        function updateClock() {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        function addPin(num) {
+            if (currentPin.length < 4) {
+                currentPin += num;
+                document.getElementById('pinDisplay').innerText = "*".repeat(currentPin.length);
+                if (currentPin.length === 4) setTimeout(submitPin, 300);
+            }
+        }
+
+        function clearPin() {
+            currentPin = "";
+            document.getElementById('pinDisplay').innerText = "";
+            document.getElementById('checkinMsg').innerText = "";
+        }
+
+        async function submitPin() {
+            if (currentPin.length !== 4) return;
+            const msgEl = document.getElementById('checkinMsg');
+            msgEl.innerText = "Verifying...";
+            msgEl.style.color = "var(--warning)";
+
+            try {
+                const res = await fetch('/api/kiosk/checkin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ws_id: wsId, pin: currentPin })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    msgEl.innerText = `Welcome, ${data.name}! Status: ${data.verified_status}`;
+                    msgEl.style.color = "var(--accent)";
+                    setTimeout(() => location.reload(), 2000); // Reload to update table
+                } else {
+                    msgEl.innerText = data.error || "Error";
+                    msgEl.style.color = "var(--danger)";
+                }
+            } catch (e) {
+                msgEl.innerText = "Network Error";
+            }
+            clearPin();
+        }
+    </script>
+</body>
+</html>
