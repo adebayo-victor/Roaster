@@ -28,6 +28,7 @@
             <div class="tab active" onclick="switchTab('tab1', this)">1. Roster Setup</div>
             <div class="tab" onclick="switchTab('tab2', this)">2. Staff Registry</div>
             <div class="tab" onclick="switchTab('tab3', this)">3. Audit Logs</div>
+            <div class="tab" onclick="switchTab('tab4', this)">4. Security & Settings</div>
         </div>
 
         <!-- Tab 1: Setup -->
@@ -63,11 +64,27 @@
                     <a href="/api/admin/export/{{ workspace.id }}" class="btn btn-primary">Download CSV</a>
                 </div>
                 <table id="logsTable">
-                    <thead>
-                        <tr><th>Date</th><th>Time</th><th>Name</th><th>Status</th><th>Method</th></tr>
-                    </thead>
+                    <thead><tr><th>Date</th><th>Time</th><th>Name</th><th>Status</th><th>Method</th></tr></thead>
                     <tbody></tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Tab 4: Security & Settings -->
+        <div id="tab4" class="tab-content">
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <h3>System Data Management</h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">Warning: This will permanently delete all folders, staff, and logs.</p>
+                <button class="btn btn-outline" style="border-color: var(--danger); color: var(--danger);" onclick="resetSystem()">Reset to Clean Empty State</button>
+            </div>
+
+            <div class="card">
+                <h3>Change Master Admin Password</h3>
+                <form id="pwdForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <input type="password" id="newPwd" class="input-field" placeholder="New Password (Min 4 chars)" required>
+                    <input type="password" id="confirmPwd" class="input-field" placeholder="Confirm New Password" required>
+                    <button type="submit" class="btn btn-primary" style="grid-column: span 2; background: #f59e0b;">Update Master Password</button>
+                </form>
             </div>
         </div>
     </div>
@@ -75,14 +92,16 @@
     <script>
         const wsId = {{ workspace.id }};
 
-        function checkLogin() {
-            if (document.getElementById('adminPass').value === 'admin123') {
+        async function checkLogin() {
+            const pwd = document.getElementById('adminPass').value;
+            const res = await fetch('/api/admin/verify', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password: pwd})
+            });
+            if (res.ok) {
                 document.getElementById('loginOverlay').style.display = 'none';
                 document.getElementById('adminUI').style.display = 'block';
                 loadLogs();
-            } else {
-                alert('Invalid Password');
-            }
+            } else { alert('Invalid Password'); }
         }
 
         function switchTab(tabId, el) {
@@ -101,34 +120,39 @@
             formData.append('photo', document.getElementById('staffPhoto').files[0]);
 
             const btn = e.target.querySelector('button');
-            btn.innerText = "Processing AI...";
-            btn.disabled = true;
-
+            btn.innerText = "Processing AI..."; btn.disabled = true;
             const res = await fetch(`/api/workspace/${wsId}/staff`, { method: 'POST', body: formData });
-            if (res.ok) { 
-                alert('Staff Added Successfully!'); 
-                location.reload(); 
-            } else { 
-                alert('Error adding staff. Check console.'); 
-                btn.innerText = "Register & Add Staff";
-                btn.disabled = false;
-            }
+            if (res.ok) { alert('Staff Added!'); location.reload(); } 
+            else { alert('Error'); btn.innerText = "Register & Add Staff"; btn.disabled = false; }
         });
 
         async function loadLogs() {
             const res = await fetch(`/api/admin/logs/${wsId}`);
             const logs = await res.json();
-            const tbody = document.querySelector('#logsTable tbody');
-            tbody.innerHTML = logs.map(l => `
-                <tr>
-                    <td>${l.date_str}</td>
-                    <td>${l.clock_in_time}</td>
-                    <td>${l.staff_name}</td>
-                    <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td>
-                    <td>${l.method}</td>
-                </tr>
+            document.querySelector('#logsTable tbody').innerHTML = logs.map(l => `
+                <tr><td>${l.date_str}</td><td>${l.clock_in_time}</td><td>${l.staff_name}</td>
+                <td><span class="badge badge-${l.status.toLowerCase()}">${l.status}</span></td><td>${l.method}</td></tr>
             `).join('');
         }
+
+        async function resetSystem() {
+            if(confirm("Are you sure? This will delete ALL data.")) {
+                await fetch('/api/admin/reset', {method: 'POST'});
+                window.location.href = '/';
+            }
+        }
+
+        document.getElementById('pwdForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const p1 = document.getElementById('newPwd').value;
+            const p2 = document.getElementById('confirmPwd').value;
+            if(p1 !== p2) return alert("Passwords do not match");
+            const res = await fetch('/api/admin/password', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({new_password: p1})
+            });
+            if(res.ok) { alert("Password Updated!"); document.getElementById('pwdForm').reset(); }
+            else alert("Error updating password");
+        });
     </script>
 </body>
 </html>
